@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>PAIZINHO · Gerador de Selos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Instrument+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  :root{
+    --parchment:#F2E9D8;
+    --parchment-dk:#E6D8BA;
+    --espresso:#2E2119;
+    --espresso-soft:#5B4636;
+    --brass:#A3762F;
+    --brass-lt:#C79A4F;
+    --line:#C9B78F;
+    --white-label:#FBF7EE;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;background:var(--parchment);color:var(--espresso);font-family:'Instrument Sans',sans-serif;-webkit-font-smoothing:antialiased;}
+  #root{min-height:100vh;padding-bottom:48px;}
+
+  .topbar{
+    position:sticky;top:0;z-index:20;
+    background:var(--espresso);color:var(--white-label);
+    padding:14px 18px;display:flex;align-items:baseline;gap:10px;
+    border-bottom:3px solid var(--brass);
+  }
+  .topbar .mark{font-family:'Cormorant Garamond',serif;font-weight:600;font-size:20px;letter-spacing:.04em;}
+  .topbar .sub{font-family:'IBM Plex Mono',monospace;font-size:10.5px;opacity:.65;letter-spacing:.03em;}
+
+  .wrap{max-width:640px;margin:0 auto;padding:16px;}
+
+  .section{margin-top:22px;}
+  .section h2{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--brass);margin:0 0 10px 2px;font-weight:500;
+  }
+
+  .card{
+    background:var(--parchment-dk);
+    border:1px solid var(--line);
+    border-radius:2px;
+    padding:14px;
+  }
+
+  /* preview stage */
+  .stage{
+    background:repeating-linear-gradient(45deg, #E0D3AE 0, #E0D3AE 1px, var(--parchment) 1px, var(--parchment) 14px);
+    border:1px solid var(--line);
+    padding:22px 10px;
+    overflow:auto;
+    display:flex;justify-content:center;align-items:center;
+    min-height:200px;
+  }
+  .stage-inner{transform-origin:center center;}
+
+  .label-node{
+    background:var(--white-label);
+    position:relative;
+    box-shadow:0 2px 10px rgba(46,33,25,.25);
+    overflow:hidden;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;
+  }
+  /* moderno */
+  .label-node.moderno{
+    border:1px solid var(--espresso);
+    padding:6% 8%;
+    font-family:'Instrument Sans',sans-serif;
+  }
+  .label-node.moderno .logo{max-width:46%;max-height:38%;object-fit:contain;margin-bottom:6%;}
+  .label-node.moderno .title{font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--espresso);}
+  .label-node.moderno .subtitle{color:var(--espresso-soft);letter-spacing:.03em;margin-top:.35em;}
+  .label-node.moderno .meta{font-family:'IBM Plex Mono',monospace;color:var(--brass);margin-top:.8em;letter-spacing:.02em;}
+  .label-node.moderno .motto{font-style:italic;color:var(--espresso-soft);margin-top:.6em;}
+
+  /* rebuscado */
+  .label-node.rebuscado{
+    font-family:'Cormorant Garamond',serif;
+    padding:7% 9%;
+  }
+  .label-node.rebuscado .frame{
+    position:absolute;inset:4%;
+    border:1.4px solid var(--brass);
+  }
+  .label-node.rebuscado .frame::before{
+    content:'';position:absolute;inset:5px;border:0.6px solid var(--brass-lt);
+  }
+  .rebuscado .corner{position:absolute;width:14px;height:14px;border:1.4px solid var(--brass);}
+  .rebuscado .corner.tl{top:2.6%;left:2.6%;border-right:none;border-bottom:none;}
+  .rebuscado .corner.tr{top:2.6%;right:2.6%;border-left:none;border-bottom:none;}
+  .rebuscado .corner.bl{bottom:2.6%;left:2.6%;border-right:none;border-top:none;}
+  .rebuscado .corner.br{bottom:2.6%;right:2.6%;border-left:none;border-top:none;}
+  .label-node.rebuscado .logo{max-width:40%;max-height:32%;object-fit:contain;margin-bottom:4%;position:relative;z-index:1;}
+  .label-node.rebuscado .title{font-weight:600;letter-spacing:.03em;color:var(--espresso);position:relative;z-index:1;}
+  .label-node.rebuscado .rule{width:34%;height:1px;background:var(--brass);margin:.45em auto;position:relative;z-index:1;}
+  .label-node.rebuscado .subtitle{font-style:italic;color:var(--espresso-soft);position:relative;z-index:1;}
+  .label-node.rebuscado .meta{font-family:'IBM Plex Mono',monospace;font-size:.62em;color:var(--brass);margin-top:.7em;letter-spacing:.03em;position:relative;z-index:1;}
+  .label-node.rebuscado .motto{font-style:italic;color:var(--espresso-soft);margin-top:.5em;position:relative;z-index:1;}
+
+  /* relevo */
+  .label-node.relevo{
+    font-family:'Instrument Sans',sans-serif;
+    justify-content:center;align-items:center;
+  }
+  .relevo .bar{position:absolute;background:linear-gradient(135deg, var(--brass-lt) 0%, var(--brass) 55%, var(--espresso-soft) 100%);}
+  .relevo .logo-wrap{display:flex;flex-direction:column;align-items:center;position:relative;z-index:1;}
+  .relevo .logo{object-fit:contain;}
+  .relevo .flourish{display:flex;align-items:center;gap:6px;margin-top:6%;}
+  .relevo .flourish .ln{height:1px;background:var(--brass);}
+  .relevo .flourish .dot{width:4px;height:4px;border-radius:50%;background:var(--brass);transform:rotate(45deg);}
+  .relevo .field{position:absolute;z-index:1;}
+  .relevo .field .eyebrow{font-family:'IBM Plex Mono',monospace;color:var(--brass);letter-spacing:.14em;text-transform:uppercase;display:block;}
+  .relevo .field .value{font-family:'Cormorant Garamond',serif;color:var(--espresso);font-weight:600;display:block;line-height:1.05;overflow-wrap:break-word;}
+  .relevo .field.br-num{top:0;left:0;text-align:left;}
+  .relevo .field.br-model{bottom:0;right:0;text-align:right;}
+  .relevo .field.br-date{bottom:0;left:0;text-align:left;}
+  .relevo .accent-dot{position:absolute;border:1px solid var(--brass);transform:rotate(45deg);}
+
+  .zoomrow{display:flex;align-items:center;gap:10px;margin-top:10px;justify-content:center;}
+  .zoomrow input[type=range]{width:140px;accent-color:var(--brass);}
+  .zoomrow span{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--espresso-soft);width:38px;}
+
+  label.field{display:block;margin-bottom:12px;}
+  label.field span{display:block;font-size:11.5px;color:var(--espresso-soft);margin-bottom:4px;letter-spacing:.02em;}
+  input[type=text],input[type=number],select,textarea{
+    width:100%;padding:9px 10px;border:1px solid var(--line);background:var(--white-label);
+    color:var(--espresso);font-family:'Instrument Sans',sans-serif;font-size:14.5px;border-radius:2px;
+  }
+  input:focus,select:focus,textarea:focus{outline:2px solid var(--brass-lt);outline-offset:0;}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+
+  .toggle{display:flex;border:1px solid var(--brass);border-radius:2px;overflow:hidden;}
+  .toggle button{
+    flex:1;padding:10px 6px;background:var(--white-label);border:none;
+    font-family:'Instrument Sans',sans-serif;font-size:13.5px;color:var(--espresso-soft);cursor:pointer;
+  }
+  .toggle button.active{background:var(--brass);color:var(--white-label);font-weight:600;}
+
+  .presets{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+  .chip{
+    padding:6px 10px;border:1px solid var(--line);background:var(--white-label);
+    font-size:12px;border-radius:12px;cursor:pointer;color:var(--espresso-soft);
+    font-family:'IBM Plex Mono',monospace;
+  }
+  .chip:active{background:var(--brass-lt);color:#fff;}
+
+  .btn{
+    width:100%;padding:13px;border:none;border-radius:2px;font-family:'Instrument Sans',sans-serif;
+    font-weight:600;font-size:14.5px;letter-spacing:.02em;cursor:pointer;
+  }
+  .btn-primary{background:var(--brass);color:var(--white-label);}
+  .btn-primary:active{background:var(--espresso);}
+  .btn-ghost{background:transparent;border:1px solid var(--line);color:var(--espresso-soft);}
+  .btn-ghost:active{background:var(--parchment);}
+  .btn-row{display:flex;gap:8px;margin-top:10px;}
+  .btn-row .btn{flex:1;}
+
+  .upload-drop{
+    border:1.5px dashed var(--brass);padding:18px;text-align:center;border-radius:2px;
+    color:var(--espresso-soft);font-size:13px;background:var(--white-label);cursor:pointer;
+  }
+
+  .saved-item{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:10px 12px;background:var(--white-label);border:1px solid var(--line);
+    border-radius:2px;margin-bottom:8px;
+  }
+  .saved-item .name{font-family:'IBM Plex Mono',monospace;font-size:13px;}
+  .saved-item .actions{display:flex;gap:6px;}
+  .saved-item button{
+    border:none;background:transparent;color:var(--brass);font-size:12px;cursor:pointer;
+    text-decoration:underline;padding:4px;
+  }
+  .saved-item button.del{color:#9B4238;}
+
+  .empty{color:var(--espresso-soft);font-size:13px;text-align:center;padding:14px 0;}
+
+  .toast{
+    position:fixed;bottom:18px;left:50%;transform:translateX(-50%);
+    background:var(--espresso);color:var(--white-label);padding:10px 18px;
+    border-radius:3px;font-size:13px;border-left:3px solid var(--brass);z-index:50;
+    box-shadow:0 4px 14px rgba(0,0,0,.3);
+  }
+
+  .exportgrid label.field{margin-bottom:8px;}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+const { useState, useEffect, useRef, useCallback } = React;
+const h = React.createElement;
+
+const LS_LOGO = 'paizinho:selo:logo';
+const LS_CURRENT = 'paizinho:selo:current';
+const LS_SAVED = 'paizinho:selo:saved';
+
+function todayBR(){
+  const d = new Date();
+  const p = n => String(n).padStart(2,'0');
+  return p(d.getDate()) + '/' + p(d.getMonth()+1) + '/' + d.getFullYear();
+}
+
+const DEFAULT_FIELDS = {
+  title: 'Violão nº 1',
+  subtitle: 'Fernando Paizinho — Luthier',
+  city: 'São Paulo, Brasil',
+  year: String(new Date().getFullYear()),
+  serial: 'PAI-00001',
+  motto: 'Feito à mão, um de cada vez.',
+  date: todayBR()
+};
+
+const SIZE_PRESETS = [
+  { label: '80×50mm', w: 80, h: 50 },
+  { label: '70×40mm', w: 70, h: 40 },
+  { label: '90×60mm', w: 90, h: 60 },
+  { label: '60×35mm', w: 60, h: 35 },
+];
+
+const BASE_PX_PER_MM = 4;
+const EXPORT_MULT = 3; // ~300dpi effective at BASE_PX_PER_MM=4
+
+function loadJSON(key, fallback){
+  try{
+    const raw = localStorage.getItem(key);
+    if(!raw) return fallback;
+    return JSON.parse(raw);
+  }catch(e){ return fallback; }
+}
+function saveJSON(key, val){
+  try{ localStorage.setItem(key, JSON.stringify(val)); }catch(e){}
+}
+
+function LabelNode({ innerRef, style, widthPx, heightPx, logo, fields }){
+  const commonStyle = { width: widthPx + 'px', height: heightPx + 'px' };
+  if(style === 'moderno'){
+    return h('div', { ref: innerRef, className: 'label-node moderno', style: commonStyle },
+      logo ? h('img', { className:'logo', src: logo }) : null,
+      h('div', { className:'title', style:{fontSize: (heightPx*0.11)+'px'} }, fields.title),
+      fields.subtitle ? h('div', { className:'subtitle', style:{fontSize:(heightPx*0.075)+'px'} }, fields.subtitle) : null,
+      h('div', { className:'meta', style:{fontSize:(heightPx*0.062)+'px'} }, [fields.city, fields.year, fields.serial].filter(Boolean).join('  ·  ')),
+      fields.motto ? h('div', { className:'motto', style:{fontSize:(heightPx*0.07)+'px'} }, fields.motto) : null
+    );
+  }
+  if(style === 'relevo'){
+    const thick = Math.max(2.2, heightPx*0.017);
+    const shadowOff = thick*0.9;
+    const shadowBlur = thick*0.8;
+    const shadow = `${shadowOff}px ${shadowOff}px ${shadowBlur}px rgba(46,33,25,.38)`;
+    const insetX = widthPx*0.07, insetY = heightPx*0.09;
+    const armW = widthPx*0.56, armH = heightPx*0.58;
+    return h('div', { ref: innerRef, className: 'label-node relevo', style: commonStyle },
+      // top-left bracket
+      h('div', { className:'bar', style:{ left:insetX, top:insetY, width:armW, height:thick, boxShadow:shadow } }),
+      h('div', { className:'bar', style:{ left:insetX, top:insetY, width:thick, height:armH, boxShadow:shadow } }),
+      // bottom-right bracket
+      h('div', { className:'bar', style:{ right:insetX, bottom:insetY, width:armW, height:thick, boxShadow:shadow } }),
+      h('div', { className:'bar', style:{ right:insetX, bottom:insetY, width:thick, height:armH, boxShadow:shadow } }),
+      // small balancing accent, top-right (open corner)
+      h('div', { className:'accent-dot', style:{ top:insetY, right:insetX, width:thick*1.6, height:thick*1.6 } }),
+
+      // center: logo
+      h('div', { className:'logo-wrap' },
+        logo ? h('img', { className:'logo', src: logo, style:{ maxWidth:(widthPx*0.32)+'px', maxHeight:(heightPx*0.34)+'px' } }) : null
+      ),
+
+      // corner fields
+      h('div', { className:'field br-num', style:{ top:insetY+thick+heightPx*0.05, left:insetX+thick+widthPx*0.035 } },
+        h('span', { className:'eyebrow', style:{fontSize:(heightPx*0.05)+'px'} }, 'Nº'),
+        h('span', { className:'value', style:{fontSize:(heightPx*0.09)+'px'} }, fields.serial)
+      ),
+      h('div', { className:'field br-model', style:{ bottom:insetY+thick+heightPx*0.05, right:insetX+thick+widthPx*0.035, maxWidth:(widthPx*0.42)+'px' } },
+        h('span', { className:'eyebrow', style:{fontSize:(heightPx*0.05)+'px'} }, 'Modelo'),
+        h('span', { className:'value', style:{fontSize:(heightPx*0.09)+'px'} }, fields.title)
+      ),
+      h('div', { className:'field br-date', style:{ bottom:insetY+heightPx*0.02, left:insetX+widthPx*0.01 } },
+        h('span', { className:'eyebrow', style:{fontSize:(heightPx*0.05)+'px'} }, 'Data'),
+        h('span', { className:'value', style:{fontSize:(heightPx*0.08)+'px'} }, fields.date)
+      )
+    );
+  }
+
+  return h('div', { ref: innerRef, className: 'label-node rebuscado', style: commonStyle },
+    h('div', { className:'frame' }),
+    h('div', { className:'corner tl' }), h('div', { className:'corner tr' }),
+    h('div', { className:'corner bl' }), h('div', { className:'corner br' }),
+    logo ? h('img', { className:'logo', src: logo }) : null,
+    h('div', { className:'title', style:{fontSize:(heightPx*0.135)+'px'} }, fields.title),
+    h('div', { className:'rule' }),
+    fields.subtitle ? h('div', { className:'subtitle', style:{fontSize:(heightPx*0.08)+'px'} }, fields.subtitle) : null,
+    h('div', { className:'meta' }, [fields.city, fields.year, fields.serial].filter(Boolean).join('  ·  ')),
+    fields.motto ? h('div', { className:'motto', style:{fontSize:(heightPx*0.075)+'px'} }, fields.motto) : null
+  );
+}
+
+function App(){
+  const [logo, setLogo] = useState(() => localStorage.getItem(LS_LOGO) || null);
+  const [style, setStyle] = useState('relevo');
+  const [fields, setFields] = useState(DEFAULT_FIELDS);
+  const [wMm, setWMm] = useState(80);
+  const [hMm, setHMm] = useState(50);
+  const [zoom, setZoom] = useState(2.2);
+  const [saved, setSaved] = useState(() => loadJSON(LS_SAVED, []));
+  const [toast, setToast] = useState(null);
+  const [exportMode, setExportMode] = useState('single'); // 'single' | 'sheet'
+  const [copies, setCopies] = useState(6);
+  const [busy, setBusy] = useState(false);
+
+  const nodeRef = useRef(null);
+  const fileRef = useRef(null);
+
+  // restore last session
+  useEffect(() => {
+    const cur = loadJSON(LS_CURRENT, null);
+    if(cur){
+      if(cur.style) setStyle(cur.style);
+      if(cur.fields) setFields(cur.fields);
+      if(cur.wMm) setWMm(cur.wMm);
+      if(cur.hMm) setHMm(cur.hMm);
+    }
+  }, []);
+
+  // persist current session
+  useEffect(() => {
+    saveJSON(LS_CURRENT, { style, fields, wMm, hMm });
+  }, [style, fields, wMm, hMm]);
+
+  function flash(msg){
+    setToast(msg);
+    setTimeout(() => setToast(null), 2200);
+  }
+
+  function handleLogoFile(e){
+    const file = e.target.files && e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result;
+      setLogo(dataUrl);
+      try{ localStorage.setItem(LS_LOGO, dataUrl); }
+      catch(err){ flash('Logo salva apenas nesta sessão (arquivo grande demais para o navegador).'); }
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function updateField(key, val){
+    setFields(f => ({ ...f, [key]: val }));
+  }
+
+  function applyPreset(p){ setWMm(p.w); setHMm(p.h); }
+
+  function saveCurrent(){
+    const name = window.prompt('Nome para este selo (ex: Violão 1 — Eclipse):', fields.title || 'Selo');
+    if(!name) return;
+    const entry = { id: Date.now(), name, style, fields, wMm, hMm };
+    const next = [entry, ...saved];
+    setSaved(next);
+    saveJSON(LS_SAVED, next);
+    flash('Selo salvo.');
+  }
+  function loadSaved(entry){
+    setStyle(entry.style); setFields(entry.fields); setWMm(entry.wMm); setHMm(entry.hMm);
+    flash('Selo carregado: ' + entry.name);
+  }
+  function deleteSaved(id){
+    const next = saved.filter(s => s.id !== id);
+    setSaved(next); saveJSON(LS_SAVED, next);
+  }
+
+  const widthPx = Math.round(wMm * BASE_PX_PER_MM);
+  const heightPx = Math.round(hMm * BASE_PX_PER_MM);
+
+  const captureCanvas = useCallback(async () => {
+    if(document.fonts && document.fonts.ready){
+      try{ await document.fonts.ready; }catch(e){}
+    }
+    return await html2canvas(nodeRef.current, {
+      scale: EXPORT_MULT,
+      backgroundColor: '#FBF7EE',
+      useCORS: true,
+    });
+  }, []);
+
+  async function exportPdf(){
+    if(!nodeRef.current) return;
+    setBusy(true);
+    try{
+      const canvas = await captureCanvas();
+      const imgData = canvas.toDataURL('image/jpeg', 0.95);
+      const { jsPDF } = window.jspdf;
+
+      if(exportMode === 'single'){
+        const pdf = new jsPDF({ unit:'mm', format:[wMm, hMm], orientation: wMm >= hMm ? 'landscape' : 'portrait' });
+        pdf.addImage(imgData, 'JPEG', 0, 0, wMm, hMm);
+        pdf.save((fields.title || 'selo').replace(/[^\w-]+/g,'_') + '.pdf');
+      } else {
+        const pageW = 210, pageH = 297, margin = 8, gap = 4;
+        const cols = Math.max(1, Math.floor((pageW - margin*2 + gap) / (wMm + gap)));
+        const rows = Math.max(1, Math.floor((pageH - margin*2 + gap) / (hMm + gap)));
+        const perPage = cols * rows;
+        const pdf = new jsPDF({ unit:'mm', format:'a4', orientation:'portrait' });
+        let placed = 0;
+        while(placed < copies){
+          if(placed > 0) pdf.addPage();
+          for(let r=0; r<rows && placed<copies; r++){
+            for(let c=0; c<cols && placed<copies; c++){
+              const x = margin + c*(wMm+gap);
+              const y = margin + r*(hMm+gap);
+              pdf.addImage(imgData, 'JPEG', x, y, wMm, hMm);
+              pdf.setDrawColor(180,170,140);
+              pdf.setLineDashPattern([1,1], 0);
+              pdf.rect(x, y, wMm, hMm);
+              placed++;
+            }
+          }
+        }
+        pdf.save((fields.title || 'selo').replace(/[^\w-]+/g,'_') + '_folha.pdf');
+      }
+      flash('PDF gerado.');
+    } catch(err){
+      console.error(err);
+      flash('Erro ao gerar PDF. Veja o console.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return h('div', null,
+    h('div', { className:'topbar' },
+      h('span', { className:'mark' }, 'PAIZINHO'),
+      h('span', { className:'sub' }, 'GERADOR DE SELOS')
+    ),
+    h('div', { className:'wrap' },
+
+      // preview
+      h('div', { className:'section' },
+        h('h2', null, 'Pré-visualização'),
+        h('div', { className:'stage' },
+          h('div', { className:'stage-inner', style:{ transform:`scale(${zoom})` } },
+            h(LabelNode, { innerRef: nodeRef, style, widthPx, heightPx, logo, fields })
+          )
+        ),
+        h('div', { className:'zoomrow' },
+          h('span', null, 'zoom'),
+          h('input', { type:'range', min:1, max:4, step:0.1, value:zoom, onChange:e=>setZoom(parseFloat(e.target.value)) }),
+          h('span', null, zoom.toFixed(1)+'×')
+        )
+      ),
+
+      // logo
+      h('div', { className:'section' },
+        h('h2', null, 'Logo'),
+        h('div', { className:'card' },
+          h('div', { className:'upload-drop', onClick:()=>fileRef.current && fileRef.current.click() },
+            logo ? 'Trocar imagem da logo' : 'Toque para enviar sua logo (PNG com fundo transparente funciona melhor)'
+          ),
+          h('input', { ref:fileRef, type:'file', accept:'image/*', style:{display:'none'}, onChange:handleLogoFile })
+        )
+      ),
+
+      // style
+      h('div', { className:'section' },
+        h('h2', null, 'Estilo do selo'),
+        h('div', { className:'toggle' },
+          h('button', { className: style==='moderno' ? 'active' : '', onClick:()=>setStyle('moderno') }, 'Moderno'),
+          h('button', { className: style==='rebuscado' ? 'active' : '', onClick:()=>setStyle('rebuscado') }, 'Rebuscado'),
+          h('button', { className: style==='relevo' ? 'active' : '', onClick:()=>setStyle('relevo') }, 'Relevo')
+        )
+      ),
+
+      // text fields
+      h('div', { className:'section' },
+        h('h2', null, 'Dizeres'),
+        h('div', { className:'card' },
+          h('label', { className:'field' }, h('span', null, 'Título (ex: nome do instrumento)'),
+            h('input', { type:'text', value:fields.title, onChange:e=>updateField('title', e.target.value) })),
+          h('label', { className:'field' }, h('span', null, 'Linha do luthier'),
+            h('input', { type:'text', value:fields.subtitle, onChange:e=>updateField('subtitle', e.target.value) })),
+          h('div', { className:'row2' },
+            h('label', { className:'field' }, h('span', null, 'Cidade'),
+              h('input', { type:'text', value:fields.city, onChange:e=>updateField('city', e.target.value) })),
+            h('label', { className:'field' }, h('span', null, 'Ano'),
+              h('input', { type:'text', value:fields.year, onChange:e=>updateField('year', e.target.value) }))
+          ),
+          h('div', { className:'row2' },
+            h('label', { className:'field' }, h('span', null, 'Número de série'),
+              h('input', { type:'text', value:fields.serial, onChange:e=>updateField('serial', e.target.value) })),
+            h('label', { className:'field' }, h('span', null, 'Data'),
+              h('input', { type:'text', value:fields.date, onChange:e=>updateField('date', e.target.value) }))
+          ),
+          h('label', { className:'field' }, h('span', null, 'Frase (opcional)'),
+            h('input', { type:'text', value:fields.motto, onChange:e=>updateField('motto', e.target.value) }))
+        )
+      ),
+
+      // size
+      h('div', { className:'section' },
+        h('h2', null, 'Tamanho do selo (mm)'),
+        h('div', { className:'card' },
+          h('div', { className:'row2' },
+            h('label', { className:'field' }, h('span', null, 'Largura (mm)'),
+              h('input', { type:'number', min:20, max:200, value:wMm, onChange:e=>setWMm(Number(e.target.value)||1) })),
+            h('label', { className:'field' }, h('span', null, 'Altura (mm)'),
+              h('input', { type:'number', min:20, max:200, value:hMm, onChange:e=>setHMm(Number(e.target.value)||1) }))
+          ),
+          h('div', { className:'presets' },
+            SIZE_PRESETS.map(p => h('div', { key:p.label, className:'chip', onClick:()=>applyPreset(p) }, p.label))
+          )
+        )
+      ),
+
+      // export
+      h('div', { className:'section' },
+        h('h2', null, 'Exportar PDF'),
+        h('div', { className:'card exportgrid' },
+          h('div', { className:'toggle', style:{marginBottom:10} },
+            h('button', { className: exportMode==='single' ? 'active' : '', onClick:()=>setExportMode('single') }, 'Selo único'),
+            h('button', { className: exportMode==='sheet' ? 'active' : '', onClick:()=>setExportMode('sheet') }, 'Folha A4 (cópias)')
+          ),
+          exportMode === 'sheet' ? h('label', { className:'field' }, h('span', null, 'Quantidade de cópias'),
+            h('input', { type:'number', min:1, max:60, value:copies, onChange:e=>setCopies(Number(e.target.value)||1) })
+          ) : null,
+          h('button', { className:'btn btn-primary', onClick:exportPdf, disabled:busy },
+            busy ? 'Gerando...' : 'Gerar PDF para impressão')
+        )
+      ),
+
+      // saved
+      h('div', { className:'section' },
+        h('h2', null, 'Selos salvos'),
+        h('div', { className:'btn-row' },
+          h('button', { className:'btn btn-ghost', onClick:saveCurrent }, 'Salvar selo atual')
+        ),
+        h('div', { style:{marginTop:10} },
+          saved.length === 0
+            ? h('div', { className:'empty' }, 'Nenhum selo salvo ainda.')
+            : saved.map(entry => h('div', { key:entry.id, className:'saved-item' },
+                h('span', { className:'name' }, entry.name),
+                h('div', { className:'actions' },
+                  h('button', { onClick:()=>loadSaved(entry) }, 'abrir'),
+                  h('button', { className:'del', onClick:()=>deleteSaved(entry.id) }, 'excluir')
+                )
+              ))
+        )
+      )
+    ),
+    toast ? h('div', { className:'toast' }, toast) : null
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(h(App));
+</script>
+</body>
+</html>
